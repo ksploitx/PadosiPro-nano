@@ -1,11 +1,15 @@
 # Docs
 docs/ROADMAP.md
 docs/STITCH_PROMPTS.md
+error_logs.md
 
 # Environment Variables
 backend/venv/
 backend/.venv/
 backend/.env
+*.db
+*.sqlite
+*.sqlite3
 
 # Python
 __pycache__/
