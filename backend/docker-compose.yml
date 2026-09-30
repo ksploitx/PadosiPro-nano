@@ -1,0 +1,21 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite+aiosqlite:///./padosipro.db
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET=supersecretjwtkey
+    depends_on:
+      redis:
+        condition: service_started
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+  mailpit:
+    image: axllent/mailpit
+    ports:
+      - "8025:8025"
+      - "1025:1025"
