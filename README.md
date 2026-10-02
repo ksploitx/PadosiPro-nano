@@ -39,12 +39,13 @@ This will spin up the FastAPI app, Redis, and Mailpit in isolated containers.
    curl http://localhost:8000/health
    ```
 
-### Method 2: Locally with a Virtual Environment
-Use this method if you want to run the FastAPI app directly on your host machine for easier debugging.
+### Method 2: Locally with a Virtual Environment (with Docker for backing services)
+Use this method if you want to run the FastAPI app directly on your host machine for easier debugging, while keeping the database/redis isolated.
 
-1. Navigate to the backend directory:
+1. Start Redis and Mailpit via Docker Compose:
    ```bash
    cd backend
+   docker compose up -d redis mailpit
    ```
 2. Create and activate a virtual environment:
    ```bash
@@ -55,11 +56,22 @@ Use this method if you want to run the FastAPI app directly on your host machine
    ```bash
    pip install -r requirements.txt
    ```
-4. Start required backing services (like Redis) either via Docker or locally.
-5. Run the FastAPI application:
+4. Run the FastAPI application:
    ```bash
    uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
+
+**Testing on Localhost & Postman:**
+- Once running, the API is available at `http://localhost:8000`.
+- **Swagger UI (Interactive Docs):** Open `http://localhost:8000/docs` in your browser. This is the easiest way to test endpoints without Postman.
+- **Mailpit UI (OTP Emails):** Open `http://localhost:8025` in your browser to see the verification emails.
+
+If you prefer **Postman**:
+1. Create a new request in Postman.
+2. Set the method (e.g., `POST`).
+3. Set the URL (e.g., `http://localhost:8000/auth/register`).
+4. Go to the **Body** tab, select **raw** and choose **JSON**.
+5. Paste the request payload (e.g., `{"email": "test@example.com", "password": "Password123"}`) and click **Send**.
 
 ## Building the APK (Mobile)
 
