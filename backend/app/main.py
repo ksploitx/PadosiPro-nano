@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.database import engine, Base
 from app.redis_client import redis_client
-from app.routers import auth
+from app.routers import auth, profile, tasks
 from app.models import User, Profile, OtpCode, Task, TaskSelection
 
 @asynccontextmanager
@@ -15,6 +15,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="PadosiPro Nano API", lifespan=lifespan)
 
 app.include_router(auth.router)
+app.include_router(profile.router)
+app.include_router(tasks.router)
 
 @app.get("/health")
 async def health_check():
