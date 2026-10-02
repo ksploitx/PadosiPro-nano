@@ -9,6 +9,8 @@ services:
       - JWT_SECRET=supersecretjwtkey
       - SMTP_HOST=mailpit
       - SMTP_PORT=1025
+    volumes:
+      - .:/app
     depends_on:
       redis:
         condition: service_started
