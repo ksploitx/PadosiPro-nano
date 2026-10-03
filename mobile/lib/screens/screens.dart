@@ -1,98 +1,9 @@
+// screens.dart — Phase 3/4 placeholder screens for features not yet built.
+//
+// LoginScreen, RegisterScreen, VerifyOtpScreen are now in their own files
+// under screens/. Only non-auth placeholders live here.
 import 'package:flutter/material.dart';
 import '../theme.dart';
-
-/// Placeholder – Phase 4 will replace body with real form fields.
-class LoginScreen extends StatelessWidget {
-  static const routeName = '/login';
-  const LoginScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text(
-                'Login Screen',
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 24),
-              // Quick-nav buttons so you can test routing in Phase 3
-              _NavButton(
-                label: 'Go to Register',
-                onTap: () => Navigator.pushNamed(context, RegisterScreen.routeName),
-              ),
-              _NavButton(
-                label: 'Go to Verify OTP',
-                onTap: () => Navigator.pushNamed(
-                  context,
-                  VerifyOtpScreen.routeName,
-                  arguments: 'test@example.com',
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-class RegisterScreen extends StatelessWidget {
-  static const routeName = '/register';
-  const RegisterScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return _PlaceholderScreen(
-      name: 'Register Screen',
-      navButtons: [
-        _NavButton(
-          label: 'Go to Verify OTP',
-          onTap: () => Navigator.pushNamed(
-            context,
-            VerifyOtpScreen.routeName,
-            arguments: 'test@example.com',
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-class VerifyOtpScreen extends StatelessWidget {
-  static const routeName = '/verify-otp';
-  const VerifyOtpScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    // The real screen will read the email from route arguments.
-    final email = ModalRoute.of(context)?.settings.arguments as String?;
-    return _PlaceholderScreen(
-      name: 'Verify OTP Screen',
-      subtitle: email != null ? 'Email: $email' : null,
-      navButtons: [
-        _NavButton(
-          label: 'Go to Profile',
-          onTap: () => Navigator.pushNamed(context, ProfileScreen.routeName),
-        ),
-        _NavButton(
-          label: 'Go to Home',
-          onTap: () => Navigator.pushNamed(context, HomeScreen.routeName),
-        ),
-      ],
-    );
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 class ProfileScreen extends StatelessWidget {
@@ -199,15 +110,13 @@ class HomeScreen extends StatelessWidget {
 // Shared helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// Generic placeholder scaffold used by all stub screens.
+/// Generic placeholder scaffold used by stub screens.
 class _PlaceholderScreen extends StatelessWidget {
   final String name;
-  final String? subtitle;
   final List<Widget> navButtons;
 
   const _PlaceholderScreen({
     required this.name,
-    this.subtitle,
     this.navButtons = const [],
   });
 
@@ -230,16 +139,6 @@ class _PlaceholderScreen extends StatelessWidget {
                 color: AppColors.textPrimary,
               ),
             ),
-            if (subtitle != null) ...[
-              const SizedBox(height: 8),
-              Text(
-                subtitle!,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
             const SizedBox(height: 32),
             ...navButtons,
           ],
@@ -249,7 +148,7 @@ class _PlaceholderScreen extends StatelessWidget {
   }
 }
 
-/// Small tappable pill used for Phase-3 screen navigation testing.
+/// Small tappable pill used for quick navigation testing.
 class _NavButton extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
@@ -267,6 +166,3 @@ class _NavButton extends StatelessWidget {
     );
   }
 }
-
-// Re-export route name references used in main.dart
-// (import this file and access via LoginScreen.routeName etc.)
