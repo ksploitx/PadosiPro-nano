@@ -1,0 +1,27 @@
+# flutter_launcher_icons configuration
+# Run: dart run flutter_launcher_icons
+#
+# This generates icons for both Android and iOS from the single source PNG.
+# The PNG at assets/icon/icon.png is the padosipro-logo (square-ish, already
+# dark green on transparent/light background).
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  image_path: "assets/icon/icon.png"
+
+  # Android adaptive icon (API 26+)
+  # Use the warm off-white background so the icon looks on-brand in
+  # the adaptive-icon circle/squircle shape.
+  adaptive_icon_background: "#FAF6F1"
+  adaptive_icon_foreground: "assets/icon/icon.png"
+  min_sdk_android: 21
+
+  # Remove any previously generated icons when regenerating
+  remove_alpha_ios: false
+  web:
+    generate: false
+  windows:
+    generate: false
+  macos:
+    generate: false
