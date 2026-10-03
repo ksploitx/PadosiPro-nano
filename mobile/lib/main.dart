@@ -5,6 +5,14 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'theme.dart';
 import 'services/api_client.dart';
 import 'state/app_state.dart';
+
+// ── Auth screens (Phase 4) ──────────────────────────────────────────────────
+import 'screens/login_screen.dart';
+import 'screens/register_screen.dart';
+import 'screens/verify_otp_screen.dart';
+import 'screens/home_gate.dart';
+
+// ── Placeholder screens (still in screens.dart until later phases) ──────────
 import 'screens/screens.dart';
 
 void main() async {
@@ -39,7 +47,6 @@ class PadosiProApp extends StatelessWidget {
       theme: buildAppTheme(),
 
       // ── Initial route ────────────────────────────────────────────────────
-      // Decides where to land based on whether the user is already logged in.
       initialRoute: _resolveInitialRoute(context),
 
       // ── Named routes ─────────────────────────────────────────────────────
@@ -47,6 +54,9 @@ class PadosiProApp extends StatelessWidget {
         LoginScreen.routeName: (_) => const LoginScreen(),
         RegisterScreen.routeName: (_) => const RegisterScreen(),
         VerifyOtpScreen.routeName: (_) => const VerifyOtpScreen(),
+        HomeGate.routeName: (_) => const HomeGate(),
+
+        // Phase 5+ placeholders (kept from screens.dart)
         ProfileScreen.routeName: (_) => const ProfileScreen(),
         TaskSelectionScreen.routeName: (_) => const TaskSelectionScreen(),
         HomeScreen.routeName: (_) => const HomeScreen(),
@@ -59,7 +69,8 @@ class PadosiProApp extends StatelessWidget {
   String _resolveInitialRoute(BuildContext context) {
     final state = context.read<AppState>();
     if (!state.isLoggedIn) return LoginScreen.routeName;
-    if (!state.hasCompletedProfile) return ProfileScreen.routeName;
-    return HomeScreen.routeName;
+    // After login, route to HomeGate which will eventually split
+    // between Profile and Home based on hasCompletedProfile.
+    return HomeGate.routeName;
   }
 }

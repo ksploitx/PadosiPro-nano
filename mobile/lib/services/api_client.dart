@@ -20,10 +20,12 @@ class ApiException implements Exception {
 ///   status code
 class ApiClient {
   // ── Base URL ─────────────────────────────────────────────────────────────
-  // For the Android emulator use 10.0.2.2 (which maps to the host machine's
-  // loopback). For iOS simulator use localhost. Swap to your server address
-  // for a real device or production build.
-  static const String baseUrl = 'http://10.0.2.2:8000';
+  // Real Android device on the same Wi-Fi as the dev machine:
+  //   Use the Mac's LAN IP (not 10.0.2.2 which is emulator-only).
+  //   Find it with:  ipconfig getifaddr en0
+  //
+  // Android emulator only: use 10.0.2.2 (maps to host loopback).
+  static const String baseUrl = 'http://192.168.1.3:8000';
 
   String? _token;
 
