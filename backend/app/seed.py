@@ -24,8 +24,8 @@ TASKS = [
     },
     {
         "category": "Home Services",
-        "name": "Plumbing Repairs",
-        "description": "Fix leaking taps, pipes, blocked drains, and water heater issues.",
+        "name": "Repairs",
+        "description": "Furniture assembly · Handyman on-call services · Painting & carpentry work",
     },
     {
         "category": "Home Services",
@@ -34,13 +34,13 @@ TASKS = [
     },
     {
         "category": "Home Services",
-        "name": "AC Servicing",
-        "description": "Air-conditioner cleaning, gas refill, and routine maintenance.",
+        "name": "Appliances & Utilities",
+        "description": "AC servicing & installation · Electrical work & appliance fixing · Gas pipeline inspection.",
     },
     {
         "category": "Home Services",
-        "name": "Pest Control",
-        "description": "Treatment for cockroaches, ants, mosquitoes, and rodents.",
+        "name": "Property & Society",
+        "description": "Home inspection before travel · Society compliance work.",
     },
 
     # ── Errands & Daily Tasks ─────────────────────────────────────────────────
@@ -75,53 +75,53 @@ TASKS = [
         "description": "Get your car cleaned, vacuumed, and tank topped up.",
     },
 
-    # ── Business Support ──────────────────────────────────────────────────────
+    # ── Travel & Tourism ──────────────────────────────────────────────────────
     {
-        "category": "Business Support",
-        "name": "Office Supply Restocking",
-        "description": "Procure stationery, printer cartridges, and consumables for your office.",
+        "category": "Travel & Tourism",
+        "name": "Book Travel",
+        "description": "Hotel & Homestay Selection · Itineray planning & rescheduling · Flight Booking & rebooking.",
     },
     {
-        "category": "Business Support",
-        "name": "Document Printing & Binding",
-        "description": "Print, laminate, or bind reports, agreements, and presentations.",
+        "category": "Travel & Tourism",
+        "name": "On-Trip Support",
+        "description": "Language & local guide support · Luggage handling & storage · SIM card & connectivity setup",
     },
     {
-        "category": "Business Support",
-        "name": "Bank & Government Errands",
-        "description": "Visit bank branches or government offices to submit or collect documents.",
+        "category": "Travel & Tourism",
+        "name": "Documents & Visa",
+        "description": "Permit & entry pass coordination · Visa document preparation support.",
     },
     {
-        "category": "Business Support",
-        "name": "Parcel Dispatch",
-        "description": "Pack and ship client orders or business parcels via courier services.",
+        "category": "Travel & Tourism",
+        "name": "Local Transport",
+        "description": "Airport pickup/drop coordination · Local cab & driver arrangement",
     },
 
-    # ── Personal Care & Lifestyle ─────────────────────────────────────────────
+    # ── Workspace Management ─────────────────────────────────────────────
     {
-        "category": "Personal Care & Lifestyle",
-        "name": "Salon Appointment Booking",
-        "description": "Schedule haircuts, facials, and grooming sessions at your preferred salon.",
+        "category": "Workspace Management",
+        "name": "Hire Staff",
+        "description": "Temporary staff arrangement · Maid onboarding & replacement · Driver hiring & verification",
     },
     {
-        "category": "Personal Care & Lifestyle",
-        "name": "Meal Planning & Tiffin Arrangement",
-        "description": "Source and coordinate daily home-cooked or tiffin meals for you.",
+        "category": "Workspace Management",
+        "name": "Staff Records & Payroll",
+        "description": "Staff document management · Attendance tracking · Salary & leave tracking",
     },
     {
-        "category": "Personal Care & Lifestyle",
-        "name": "Pet Care",
-        "description": "Dog walking, grooming appointments, and pet-supply pickup.",
+        "category": "Workspace Management",
+        "name": "Verification",
+        "description": "Police verification handling and citizenship status.",
     },
     {
-        "category": "Personal Care & Lifestyle",
-        "name": "Event & Gift Arrangements",
-        "description": "Plan birthday surprises, buy gifts, and arrange flower or cake deliveries.",
+        "category": "Workspace Management",
+        "name": "Replacement & Exit",
+        "description": "Conflict resolution support · Exit & transition support · Cook scheduling & backup",
     },
     {
-        "category": "Personal Care & Lifestyle",
-        "name": "Travel Booking Assistance",
-        "description": "Research and book flights, trains, hotels, and cabs for your trips.",
+        "category": "Workspace Management",
+        "name": "Business Travel Assistance",
+        "description": "Research and book flights, trains, hotels, and cabs for business trips.",
     },
 ]
 
