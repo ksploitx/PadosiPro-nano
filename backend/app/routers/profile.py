@@ -9,6 +9,17 @@ from app.schemas import ProfileRequest, ProfileResponse
 router = APIRouter(prefix="/profile", tags=["profile"])
 
 
+def _build_response(profile: Profile, user: User) -> ProfileResponse:
+    """Merge Profile row + User.email into a ProfileResponse."""
+    return ProfileResponse(
+        name=profile.name,
+        mobile_number=profile.mobile_number,
+        address=profile.address,
+        business_name=profile.business_name,
+        email=user.email,
+    )
+
+
 @router.put("", response_model=ProfileResponse)
 async def upsert_profile(
     body: ProfileRequest,
@@ -35,7 +46,7 @@ async def upsert_profile(
 
     await db.commit()
     await db.refresh(profile)
-    return profile
+    return _build_response(profile, current_user)
 
 
 @router.get("", response_model=ProfileResponse)
@@ -59,4 +70,4 @@ async def get_profile(
             detail="Profile not found",
         )
 
-    return profile
+    return _build_response(profile, current_user)

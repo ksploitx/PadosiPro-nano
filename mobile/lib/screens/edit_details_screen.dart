@@ -93,7 +93,8 @@ class _EditDetailsScreenState extends State<EditDetailsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final email = context.read<AppState>().email ?? '';
+    // prefer email from profile response; fall back to AppState cache
+    final email = widget.profile.email ?? context.read<AppState>().email ?? '';
     final initials = _initials(widget.profile.name);
 
     return Scaffold(

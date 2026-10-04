@@ -139,7 +139,9 @@ class _ProfileTabScreenState extends State<ProfileTabScreen> {
 
     return _ProfileContent(
       profile: _profile!,
-      email: context.read<AppState>().email ?? '',
+      // prefer email from GET /profile (now included in response);
+      // fall back to AppState cache for resilience
+      email: _profile!.email ?? context.read<AppState>().email ?? '',
       onEditPressed: () async {
         await Navigator.push(
           context,

@@ -81,6 +81,7 @@ class ProfileResponse(BaseModel):
     mobile_number: str
     address: str
     business_name: str | None
+    email: str
 
     model_config = {"from_attributes": True}
 
