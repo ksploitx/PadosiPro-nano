@@ -51,6 +51,10 @@ async def replace_selection(
     for sel in existing.scalars().all():
         await db.delete(sel)
 
+    # Flush deletes so the UNIQUE constraint (user_id, task_id) is cleared
+    # before we insert the new rows — otherwise SQLite raises IntegrityError.
+    await db.flush()
+
     new_selections: list[TaskSelection] = []
     for item in body.selections:
         sel = TaskSelection(
