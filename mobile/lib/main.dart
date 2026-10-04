@@ -12,7 +12,11 @@ import 'screens/register_screen.dart';
 import 'screens/verify_otp_screen.dart';
 import 'screens/home_gate.dart';
 
-// ── Placeholder screens (still in screens.dart until later phases) ──────────
+// ── Phase 5 screens ─────────────────────────────────────────────────────────
+import 'screens/profile_screen.dart';
+import 'screens/task_selection_screen.dart';
+
+// ── Placeholder screens (HomeScreen still in screens.dart until Phase 6) ────
 import 'screens/screens.dart';
 
 void main() async {
@@ -56,9 +60,11 @@ class PadosiProApp extends StatelessWidget {
         VerifyOtpScreen.routeName: (_) => const VerifyOtpScreen(),
         HomeGate.routeName: (_) => const HomeGate(),
 
-        // Phase 5+ placeholders (kept from screens.dart)
+        // Phase 5
         ProfileScreen.routeName: (_) => const ProfileScreen(),
         TaskSelectionScreen.routeName: (_) => const TaskSelectionScreen(),
+
+        // Phase 6 placeholder
         HomeScreen.routeName: (_) => const HomeScreen(),
       },
     );
@@ -69,8 +75,7 @@ class PadosiProApp extends StatelessWidget {
   String _resolveInitialRoute(BuildContext context) {
     final state = context.read<AppState>();
     if (!state.isLoggedIn) return LoginScreen.routeName;
-    // After login, route to HomeGate which will eventually split
-    // between Profile and Home based on hasCompletedProfile.
+    // After login, HomeGate decides: Profile vs Home via GET /profile.
     return HomeGate.routeName;
   }
 }

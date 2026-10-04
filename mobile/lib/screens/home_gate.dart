@@ -2,85 +2,77 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../state/app_state.dart';
+import '../services/profile_service.dart';
+import '../services/api_client.dart';
 import '../theme.dart';
+import 'profile_screen.dart';
+import 'task_selection_screen.dart';
+import 'screens.dart'; // HomeScreen
 
 /// Not a visible screen. Decides where to send the user after a successful
 /// login or OTP verification:
-/// - Profile not completed → Profile screen (placeholder for now)
-/// - Profile completed → Home screen (placeholder for now)
 ///
-/// Phase 4 scope: we land on a simple placeholder with a "Log out" button
-/// so you can exercise step 5 and 6 of the verification checklist.
-class HomeGate extends StatelessWidget {
+///   GET /profile
+///     → 404  : no profile yet  → Profile screen
+///     → 200  : profile exists  → Phase 6 home (placeholder HomeScreen for now)
+///
+/// Phase 5 logic: this is the real routing gate. We do the network call here
+/// so that if the user closed the app mid-onboarding we still recover to
+/// the right step.
+class HomeGate extends StatefulWidget {
   static const routeName = '/home-gate';
   const HomeGate({super.key});
 
   @override
+  State<HomeGate> createState() => _HomeGateState();
+}
+
+class _HomeGateState extends State<HomeGate> {
+  @override
+  void initState() {
+    super.initState();
+    // Run after first frame so Navigator is ready.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _route());
+  }
+
+  Future<void> _route() async {
+    final appState = context.read<AppState>();
+    final service = ProfileService(appState.apiClient);
+
+    try {
+      await service.getProfile(); // 200 → profile exists
+      // Profile complete → Phase 6 home (placeholder for now)
+      if (!mounted) return;
+      Navigator.pushReplacementNamed(context, HomeScreen.routeName);
+    } on ApiException catch (e) {
+      if (e.statusCode == 404) {
+        // No profile yet → create profile
+        if (!mounted) return;
+        Navigator.pushReplacementNamed(context, ProfileScreen.routeName);
+      } else {
+        // Auth or network issue — retry handled by showing a re-login button
+        if (!mounted) return;
+        _showError(e.message);
+      }
+    } catch (_) {
+      if (!mounted) return;
+      _showError('Network error. Please try again.');
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(msg), backgroundColor: AppColors.error),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final appState = context.watch<AppState>();
-
-    // In future phases this will navigate to Profile or Home.
-    // For now: show a placeholder with a logout button.
-    return Scaffold(
+    // Splash while we wait for GET /profile to resolve.
+    return const Scaffold(
       backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              // App icon
-              ClipRRect(
-                borderRadius: BorderRadius.circular(20),
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  width: 80,
-                  height: 80,
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Text(
-                '🎉 You are logged in!',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                appState.hasCompletedProfile
-                    ? 'Profile complete — Home coming in a future phase.'
-                    : 'Profile incomplete — Profile screen coming in a future phase.',
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-              const SizedBox(height: 40),
-
-              // ── Debug logout button ────────────────────────────────────
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 40),
-                child: ElevatedButton(
-                  onPressed: () async {
-                    await appState.logout();
-                    if (!context.mounted) return;
-                    Navigator.pushNamedAndRemoveUntil(
-                      context,
-                      '/login',
-                      (_) => false,
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.error,
-                  ),
-                  child: const Text('Log out (debug)'),
-                ),
-              ),
-            ],
-          ),
-        ),
+      body: Center(
+        child: CircularProgressIndicator(color: AppColors.primary),
       ),
     );
   }
