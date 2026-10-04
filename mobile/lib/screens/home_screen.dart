@@ -7,15 +7,12 @@ import '../models/task.dart';
 import '../services/task_service.dart';
 import '../services/api_client.dart';
 import 'tab_shell.dart';
+import 'task_selection_screen.dart';
+import 'app_header.dart';
 
 /// Home tab — shows the user's selected tasks (GET /tasks/selection).
 ///
-/// Matches figma/Home_Screen.png with these simplifications:
-///   - No "Active runner assigned" pipeline chrome (no backend)
-///   - No Pilot LM chat bubble
-///   - "Edit tasks" switches to the Request tab via TabShell, no new route
-///
-/// States: loading → error-with-retry → empty → populated  (HLD §6)
+/// States: loading → error-with-retry → empty → populated
 class HomeTabScreen extends StatefulWidget {
   const HomeTabScreen({super.key});
 
@@ -67,42 +64,17 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: _buildAppBar(),
-      body: _buildBody(),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: AppColors.background,
-      elevation: 0,
-      scrolledUnderElevation: 0,
-      title: Image.asset(
-        'assets/padosipro-logo.png',
-        height: 36,
-        errorBuilder: (_, __, ___) => const Text(
-          'PadosiPro',
-          style: TextStyle(
-            fontWeight: FontWeight.w800,
-            fontSize: 20,
-            color: AppColors.primary,
+      // Icon-only header; avatar switches to Profile tab via TabShell
+      appBar: buildAppHeader(
+        extraActions: [
+          IconButton(
+            icon: const Icon(Icons.notifications_outlined,
+                color: AppColors.textPrimary),
+            onPressed: () {},
           ),
-        ),
+        ],
       ),
-      actions: [
-        IconButton(
-          icon: const Icon(Icons.notifications_outlined, color: AppColors.textPrimary),
-          onPressed: () {},
-        ),
-        Padding(
-          padding: const EdgeInsets.only(right: 12),
-          child: CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.primary,
-            child: const Icon(Icons.person, color: Colors.white, size: 18),
-          ),
-        ),
-      ],
+      body: _buildBody(),
     );
   }
 
@@ -118,10 +90,34 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
     }
 
     if (_tasks.isEmpty) {
-      return _EmptyState(onTapEdit: () => TabShell.of(context).switchTab(1));
+      // "Explore →" switches to the Request tab (stays inside TabShell)
+      return _EmptyState(
+        onExplore: () => TabShell.of(context).switchTab(1),
+      );
     }
 
-    return _TaskList(tasks: _tasks, onEditTasks: () => TabShell.of(context).switchTab(1));
+    return _TaskList(
+      tasks: _tasks,
+      // "Edit tasks" → open review step with tasks pre-loaded
+      onEditTasks: _openEditTasks,
+    );
+  }
+
+  /// Opens TaskSelectionScreen pushed on top of the current Navigator,
+  /// jumping directly to the review step with existing tasks pre-checked.
+  /// On return, reload the Home task list.
+  void _openEditTasks() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const TaskSelectionScreen(
+          preloadSelection: true,
+          startAtReview: true,
+        ),
+      ),
+    ).then((_) {
+      if (mounted) _load();
+    });
   }
 }
 
@@ -234,7 +230,7 @@ class _TaskList extends StatelessWidget {
 
   String _todayLabel() {
     final now = DateTime.now();
-    final months = [
+    const months = [
       'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
     ];
@@ -362,8 +358,9 @@ class _InfoPill extends StatelessWidget {
 // ── Empty state ───────────────────────────────────────────────────────────────
 
 class _EmptyState extends StatelessWidget {
-  final VoidCallback onTapEdit;
-  const _EmptyState({required this.onTapEdit});
+  /// Called when the user taps "Explore" — should switch to Request tab.
+  final VoidCallback onExplore;
+  const _EmptyState({required this.onExplore});
 
   @override
   Widget build(BuildContext context) {
@@ -374,38 +371,64 @@ class _EmptyState extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: 88,
+              height: 88,
               decoration: BoxDecoration(
                 color: AppColors.badgeBackground,
-                borderRadius: BorderRadius.circular(40),
+                borderRadius: BorderRadius.circular(44),
               ),
               child: const Icon(
-                Icons.inbox_outlined,
-                size: 40,
+                Icons.waving_hand_rounded,
+                size: 44,
                 color: AppColors.primary,
               ),
             ),
             const SizedBox(height: 20),
             const Text(
-              'No services selected yet',
+              'Welcome to PadosiPro!',
               style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Choose the services you need and your\nLifestyle Manager will handle them.',
+              'Pick the services you want handled —\nyour Lifestyle Manager is ready.',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.5),
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+                height: 1.55,
+              ),
             ),
             const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: onTapEdit,
-              icon: const Icon(Icons.add, size: 18),
-              label: const Text('Select services'),
+            // "Explore →" — stays in TabShell, switches to Request tab
+            ElevatedButton(
+              onPressed: onExplore,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 32, vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(24),
+                ),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Explore',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  SizedBox(width: 6),
+                  Icon(Icons.arrow_forward_rounded, size: 18),
+                ],
+              ),
             ),
           ],
         ),
@@ -433,10 +456,11 @@ class _ErrorState extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: AppColors.error.withOpacity(0.08),
+                color: AppColors.error.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(32),
               ),
-              child: const Icon(Icons.wifi_off_rounded, size: 32, color: AppColors.error),
+              child: const Icon(Icons.wifi_off_rounded,
+                  size: 32, color: AppColors.error),
             ),
             const SizedBox(height: 16),
             const Text(
@@ -451,7 +475,8 @@ class _ErrorState extends StatelessWidget {
             Text(
               message,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              style: const TextStyle(
+                  fontSize: 14, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 20),
             OutlinedButton.icon(
@@ -461,7 +486,8 @@ class _ErrorState extends StatelessWidget {
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.primary,
                 side: const BorderSide(color: AppColors.primary),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
             ),
           ],

@@ -7,15 +7,30 @@ import '../models/task.dart';
 import '../services/task_service.dart';
 import '../services/api_client.dart';
 import 'tab_shell.dart';
+import 'app_header.dart';
 
 /// Task Selection screen — two-step flow:
-///   Step 1 (list): search + categories + checkboxes, "X of Y chosen",
-///                  matches figma/Service.png.
-///   Step 2 (review): one card per selected task with time picker + note,
-///                    "Submit" calls PUT /tasks/selection.
+///   Step 1 (list): search + categories + checkboxes, "X of Y chosen".
+///   Step 2 (review): one card per selected task with date-chip row +
+///                    3 slot chips + note, "Submit" calls PUT /tasks/selection.
+///
+/// [preloadSelection]: calls GET /tasks/selection on init to pre-check tasks.
+/// [startAtReview]: after loading, jump directly to the review step
+///                 (used by Home → "Edit tasks" so the user lands on the
+///                  time/note editor, not the checkbox list).
 class TaskSelectionScreen extends StatefulWidget {
   static const routeName = '/task-selection';
-  const TaskSelectionScreen({super.key});
+
+  final bool preloadSelection;
+
+  /// When true, skip step 1 and show the review step immediately.
+  final bool startAtReview;
+
+  const TaskSelectionScreen({
+    super.key,
+    this.preloadSelection = false,
+    this.startAtReview = false,
+  });
 
   @override
   State<TaskSelectionScreen> createState() => _TaskSelectionScreenState();
@@ -63,9 +78,33 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
     final service = TaskService(appState.apiClient);
     try {
       final tasks = await service.getCatalogue();
+      if (!mounted) return;
+
+      // If launched from "Edit tasks", load the current selection so we can
+      // pre-check + pre-fill those tasks.
+      if (widget.preloadSelection) {
+        try {
+          final existing = await service.getSelection();
+          for (final sel in existing) {
+            _selected[sel.id] = true;
+            _reviewData[sel.id] = _ReviewData.fromExisting(sel);
+          }
+        } catch (_) {
+          // Non-fatal: proceed without pre-fill.
+        }
+      }
+
       setState(() {
         _catalogue = tasks;
         _loadingCatalogue = false;
+        // startAtReview: jump straight to review step once tasks are loaded.
+        if (widget.startAtReview && _selected.isNotEmpty) {
+          // Ensure all pre-selected tasks have review data.
+          for (final task in _catalogue.where((t) => _selected[t.id] == true)) {
+            _reviewData.putIfAbsent(task.id, () => _ReviewData());
+          }
+          _reviewStep = true;
+        }
       });
     } on ApiException catch (e) {
       setState(() {
@@ -106,7 +145,7 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
   void _onConfirm() {
     if (_totalSelected == 0) return;
 
-    // Initialize review data for newly selected tasks
+    // Initialize review data for newly selected tasks (preserve existing ones)
     for (final task in _selectedTasks) {
       _reviewData.putIfAbsent(task.id, () => _ReviewData());
     }
@@ -145,10 +184,15 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
           backgroundColor: AppColors.success,
         ),
       );
-      // If running inside TabShell, switch to Home tab; otherwise fall back to
-      // pushing the shell route (first-time onboarding flow).
+      // If this screen was pushed on top (from Home "Edit tasks"),
+      // pop back so Home reloads. If inside TabShell as the Request tab,
+      // switch to Home tab. Otherwise (first-time onboarding), push TabShell.
       final shellState = context.findAncestorStateOfType<TabShellState>();
-      if (shellState != null) {
+      final navigator = Navigator.of(context);
+      if (navigator.canPop()) {
+        // Pushed on top of Home: pop returns to Home which then reloads.
+        navigator.pop();
+      } else if (shellState != null) {
         setState(() => _reviewStep = false);
         shellState.switchTab(0);
       } else {
@@ -180,32 +224,20 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
   Widget _buildListStep() {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        leading: Image.asset('assets/images/logo.png', width: 32),
-        leadingWidth: 56,
-        actions: [
+      // Icon-only shared header; avatar in header switches to Profile tab.
+      appBar: buildAppHeader(
+        extraActions: [
           IconButton(
             icon: const Icon(Icons.notifications_outlined,
                 color: AppColors.textPrimary),
             onPressed: () {},
-          ),
-          Padding(
-            padding: const EdgeInsets.only(right: 12),
-            child: CircleAvatar(
-              radius: 16,
-              backgroundColor: AppColors.primary,
-              child: const Icon(Icons.person, color: Colors.white, size: 18),
-            ),
           ),
         ],
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Header ──────────────────────────────────────────────────
+          // ── Header ──────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 4, 20, 0),
             child: Column(
@@ -554,14 +586,30 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
 
 class _ReviewData {
   DateTime? requestedTime;
-  final TextEditingController noteCtrl = TextEditingController();
+  final TextEditingController noteCtrl;
+
+  _ReviewData()
+      : requestedTime = null,
+        noteCtrl = TextEditingController();
+
+  /// Bug 6: construct from an already-selected task, pre-filling time & note.
+  _ReviewData.fromExisting(SelectedTask sel)
+      : requestedTime = sel.requestedTime,
+        noteCtrl = TextEditingController(text: sel.note ?? '');
 
   void dispose() => noteCtrl.dispose();
 }
 
 // ── Review card widget ────────────────────────────────────────────────────────
 
-class _ReviewCard extends StatelessWidget {
+/// Bug 2: replaces showDatePicker + showTimePicker with:
+///   • A horizontal scrollable row of the next 14 date chips
+///   • Three fixed time-slot chips: 9 AM–12 PM / 1 PM–3 PM / 4 PM–6 PM
+///
+/// The resulting [requestedTime] is a [DateTime] built from the chosen date +
+/// the slot's start hour — same type/format as before so backend contract
+/// is unchanged.
+class _ReviewCard extends StatefulWidget {
   final Task task;
   final _ReviewData data;
   final ValueChanged<DateTime?> onTimeChanged;
@@ -572,56 +620,74 @@ class _ReviewCard extends StatelessWidget {
     required this.onTimeChanged,
   });
 
-  Future<void> _pickDateTime(BuildContext context) async {
-    final now = DateTime.now();
+  @override
+  State<_ReviewCard> createState() => _ReviewCardState();
+}
 
-    final date = await showDatePicker(
-      context: context,
-      initialDate: data.requestedTime ?? now,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (date == null) return;
+class _ReviewCardState extends State<_ReviewCard> {
+  // The three fixed time slots (label, start hour for DateTime construction)
+  static const _slots = [
+    ('9 AM – 12 PM', 9),
+    ('1 PM – 3 PM', 13),
+    ('4 PM – 6 PM', 16),
+  ];
 
-    if (!context.mounted) return;
-    final time = await showTimePicker(
-      context: context,
-      initialTime:
-          TimeOfDay.fromDateTime(data.requestedTime ?? now),
-      builder: (ctx, child) => Theme(
-        data: Theme.of(ctx).copyWith(
-          colorScheme: ColorScheme.light(
-            primary: AppColors.primary,
-            onPrimary: Colors.white,
-          ),
-        ),
-        child: child!,
-      ),
-    );
-    if (time == null) return;
+  // Which date chip index is selected (null = none)
+  int? _selectedDateIdx;
 
-    onTimeChanged(DateTime(
-      date.year,
-      date.month,
-      date.day,
-      time.hour,
-      time.minute,
-    ));
+  // Which slot index is selected (null = none)
+  int? _selectedSlotIdx;
+
+  @override
+  void initState() {
+    super.initState();
+    // Bug 6: if reviewData already carries a pre-filled requestedTime, map it
+    // back to the closest chip so the UI reflects the existing selection.
+    final existing = widget.data.requestedTime;
+    if (existing != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final diff = DateTime(existing.year, existing.month, existing.day)
+          .difference(today)
+          .inDays;
+      if (diff >= 0 && diff < 14) _selectedDateIdx = diff;
+      for (int i = 0; i < _slots.length; i++) {
+        if (existing.hour == _slots[i].$2) {
+          _selectedSlotIdx = i;
+          break;
+        }
+      }
+    }
+  }
+
+  void _updateTime() {
+    if (_selectedDateIdx == null || _selectedSlotIdx == null) {
+      widget.onTimeChanged(null);
+      return;
+    }
+    final base = DateTime.now();
+    final date = DateTime(base.year, base.month, base.day)
+        .add(Duration(days: _selectedDateIdx!));
+    final hour = _slots[_selectedSlotIdx!].$2;
+    widget.onTimeChanged(DateTime(date.year, date.month, date.day, hour, 0));
+  }
+
+  String _dateLabel(int dayOffset) {
+    final date =
+        DateTime.now().add(Duration(days: dayOffset));
+    if (dayOffset == 0) return 'Today';
+    if (dayOffset == 1) return 'Tomorrow';
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${weekdays[date.weekday - 1]} ${date.day} ${months[date.month - 1]}';
   }
 
   @override
   Widget build(BuildContext context) {
-    final hasTime = data.requestedTime != null;
-    final dt = data.requestedTime;
+    final hasTime = widget.data.requestedTime != null;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 14),
@@ -655,7 +721,7 @@ class _ReviewCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        task.name,
+                        widget.task.name,
                         style: const TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
@@ -664,7 +730,7 @@ class _ReviewCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Chip(
-                        label: Text(task.category),
+                        label: Text(widget.task.category),
                         visualDensity: VisualDensity.compact,
                       ),
                     ],
@@ -676,53 +742,171 @@ class _ReviewCard extends StatelessWidget {
 
           const Divider(height: 1),
 
-          // ── Time picker row ────────────────────────────────────────────
+          // ── Bug 2: Date chip row ───────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 4),
             child: Row(
               children: [
-                const Icon(Icons.schedule_rounded,
-                    size: 18, color: AppColors.textSecondary),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    hasTime
-                        ? _formatDt(dt!)
-                        : 'Preferred date & time (optional)',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: hasTime
-                          ? AppColors.textPrimary
-                          : AppColors.textHint,
-                    ),
-                  ),
+                const Icon(Icons.calendar_today_outlined,
+                    size: 15, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                const Text(
+                  'Preferred date',
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
                 ),
-                TextButton(
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(48, 32),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                if (_selectedDateIdx != null) ...[
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      setState(() => _selectedDateIdx = null);
+                      _updateTime();
+                    },
+                    child: const Icon(Icons.clear,
+                        size: 15, color: AppColors.textSecondary),
                   ),
-                  onPressed: () => _pickDateTime(context),
-                  child: Text(hasTime ? 'Change' : 'Pick'),
-                ),
-                if (hasTime)
-                  IconButton(
-                    icon: const Icon(Icons.clear,
-                        size: 16, color: AppColors.textSecondary),
-                    onPressed: () => onTimeChanged(null),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
-                  ),
+                ],
               ],
             ),
           ),
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14),
+              itemCount: 14,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (context, i) {
+                final selected = _selectedDateIdx == i;
+                return GestureDetector(
+                  onTap: () {
+                    setState(() => _selectedDateIdx = i);
+                    _updateTime();
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 140),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: selected
+                          ? AppColors.primary
+                          : AppColors.badgeBackground,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: selected
+                            ? AppColors.primary
+                            : AppColors.divider,
+                      ),
+                    ),
+                    child: Text(
+                      _dateLabel(i),
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: selected
+                            ? Colors.white
+                            : AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // ── Bug 2: Slot chips ─────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+            child: Row(
+              children: [
+                const Icon(Icons.schedule_outlined,
+                    size: 15, color: AppColors.textSecondary),
+                const SizedBox(width: 6),
+                const Text(
+                  'Preferred time slot',
+                  style: TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+            child: Row(
+              children: List.generate(_slots.length, (i) {
+                final selected = _selectedSlotIdx == i;
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: i < _slots.length - 1 ? 6 : 0),
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() =>
+                            _selectedSlotIdx = selected ? null : i);
+                        _updateTime();
+                      },
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        padding:
+                            const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: selected
+                              ? AppColors.primary
+                              : AppColors.badgeBackground,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: selected
+                                ? AppColors.primary
+                                : AppColors.divider,
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          _slots[i].$1,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: selected
+                                ? Colors.white
+                                : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+          ),
+
+          if (hasTime)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+              child: Row(
+                children: [
+                  const Icon(Icons.check_circle_outline,
+                      size: 14, color: AppColors.primary),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatDt(widget.data.requestedTime!),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          const Divider(height: 1),
 
           // ── Note field ─────────────────────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
             child: TextField(
-              controller: data.noteCtrl,
+              controller: widget.data.noteCtrl,
               maxLength: 280,
               maxLines: 2,
               decoration: InputDecoration(
@@ -759,8 +943,11 @@ class _ReviewCard extends StatelessWidget {
       'Jan','Feb','Mar','Apr','May','Jun',
       'Jul','Aug','Sep','Oct','Nov','Dec'
     ];
-    final h = dt.hour.toString().padLeft(2, '0');
-    final m = dt.minute.toString().padLeft(2, '0');
-    return '${dt.day} ${months[dt.month - 1]} ${dt.year}, $h:$m';
+    return '${dt.day} ${months[dt.month - 1]} ${dt.year} · ${_slots.firstWhere((s) => s.$2 == dt.hour, orElse: () => (_formatHour(dt.hour), dt.hour)).$1}';
+  }
+
+  String _formatHour(int hour) {
+    final h = hour % 12 == 0 ? 12 : hour % 12;
+    return '$h ${hour < 12 ? 'AM' : 'PM'}';
   }
 }

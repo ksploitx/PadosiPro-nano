@@ -6,6 +6,7 @@ import '../theme.dart';
 import '../models/profile.dart';
 import '../services/profile_service.dart';
 import '../services/api_client.dart';
+import 'app_header.dart';
 import 'edit_details_screen.dart';
 import 'household_placeholder_screen.dart';
 import 'login_screen.dart';
@@ -99,25 +100,11 @@ class _ProfileTabScreenState extends State<ProfileTabScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        title: Image.asset(
-          'assets/padosipro-logo.png',
-          height: 36,
-          errorBuilder: (_, __, ___) => const Text(
-            'PadosiPro',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              fontSize: 20,
-              color: AppColors.primary,
-            ),
-          ),
-        ),
-        actions: [
+      appBar: buildAppHeader(
+        extraActions: [
           IconButton(
-            icon: const Icon(Icons.notifications_outlined, color: AppColors.textPrimary),
+            icon: const Icon(Icons.notifications_outlined,
+                color: AppColors.textPrimary),
             onPressed: () {},
           ),
         ],
