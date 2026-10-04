@@ -6,6 +6,7 @@ import '../theme.dart';
 import '../models/task.dart';
 import '../services/task_service.dart';
 import '../services/api_client.dart';
+import 'tab_shell.dart';
 
 /// Task Selection screen — two-step flow:
 ///   Step 1 (list): search + categories + checkboxes, "X of Y chosen",
@@ -138,19 +139,25 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
       await service.saveSelection(items);
 
       if (!mounted) return;
-      // Show success and go back to Home (placeholder)
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('✅ Services saved successfully!'),
           backgroundColor: AppColors.success,
         ),
       );
-      // Navigate to home screen placeholder
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        '/home',
-        (_) => false,
-      );
+      // If running inside TabShell, switch to Home tab; otherwise fall back to
+      // pushing the shell route (first-time onboarding flow).
+      final shellState = context.findAncestorStateOfType<TabShellState>();
+      if (shellState != null) {
+        setState(() => _reviewStep = false);
+        shellState.switchTab(0);
+      } else {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          TabShell.routeName,
+          (_) => false,
+        );
+      }
     } on ApiException catch (e) {
       setState(() => _submitError = e.message);
     } catch (_) {
@@ -315,8 +322,7 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
     if (tasks.isEmpty) return const SizedBox.shrink();
 
     final total = _catalogue.where((t) => t.category == category).length;
-    final chosen = tasks.where((t) => _selected[t.id] == true).length;
-    // Count across all (even filtered-out) tasks in category
+    // Count chosen across all (even filtered-out) tasks in category
     final chosenInCat = _catalogue
         .where((t) => t.category == category && _selected[t.id] == true)
         .length;

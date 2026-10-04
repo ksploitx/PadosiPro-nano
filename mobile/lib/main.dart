@@ -16,8 +16,8 @@ import 'screens/home_gate.dart';
 import 'screens/profile_screen.dart';
 import 'screens/task_selection_screen.dart';
 
-// ── Placeholder screens (HomeScreen still in screens.dart until Phase 6) ────
-import 'screens/screens.dart';
+// ── Phase 6 screens ──────────────────────────────────────────────────
+import 'screens/tab_shell.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -64,8 +64,8 @@ class PadosiProApp extends StatelessWidget {
         ProfileScreen.routeName: (_) => const ProfileScreen(),
         TaskSelectionScreen.routeName: (_) => const TaskSelectionScreen(),
 
-        // Phase 6 placeholder
-        HomeScreen.routeName: (_) => const HomeScreen(),
+        // Phase 6
+        TabShell.routeName: (_) => const TabShell(),
       },
     );
   }

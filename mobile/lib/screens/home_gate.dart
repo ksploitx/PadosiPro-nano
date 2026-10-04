@@ -6,8 +6,7 @@ import '../services/profile_service.dart';
 import '../services/api_client.dart';
 import '../theme.dart';
 import 'profile_screen.dart';
-import 'task_selection_screen.dart';
-import 'screens.dart'; // HomeScreen
+import 'tab_shell.dart';
 
 /// Not a visible screen. Decides where to send the user after a successful
 /// login or OTP verification:
@@ -41,9 +40,9 @@ class _HomeGateState extends State<HomeGate> {
 
     try {
       await service.getProfile(); // 200 → profile exists
-      // Profile complete → Phase 6 home (placeholder for now)
+      // Profile complete → 3-tab shell
       if (!mounted) return;
-      Navigator.pushReplacementNamed(context, HomeScreen.routeName);
+      Navigator.pushReplacementNamed(context, TabShell.routeName);
     } on ApiException catch (e) {
       if (e.statusCode == 404) {
         // No profile yet → create profile

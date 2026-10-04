@@ -19,13 +19,16 @@ class AppState extends ChangeNotifier {
 
   // ── State ─────────────────────────────────────────────────────────────────
   static const _tokenKey = 'jwt_token';
+  static const _emailKey = 'user_email';
 
   String? _token;
+  String? _email;
   bool _hasCompletedProfile = false;
   bool _bootstrapped = false;
 
   // ── Getters ───────────────────────────────────────────────────────────────
   String? get token => _token;
+  String? get email => _email;
   bool get isLoggedIn => _token != null;
   bool get hasCompletedProfile => _hasCompletedProfile;
 
@@ -47,6 +50,7 @@ class AppState extends ChangeNotifier {
       _token = stored;
       apiClient.setToken(stored);
     }
+    _email = await _storage.read(key: _emailKey);
     _bootstrapped = true;
     notifyListeners();
   }
@@ -58,11 +62,14 @@ class AppState extends ChangeNotifier {
   Future<void> saveToken(
     String token, {
     required bool hasCompletedProfile,
+    String? email,
   }) async {
     _token = token;
     _hasCompletedProfile = hasCompletedProfile;
+    if (email != null) _email = email;
     apiClient.setToken(token);
     await _storage.write(key: _tokenKey, value: token);
+    if (email != null) await _storage.write(key: _emailKey, value: email);
     notifyListeners();
   }
 
@@ -75,9 +82,11 @@ class AppState extends ChangeNotifier {
   /// Clears the session — call on logout.
   Future<void> logout() async {
     _token = null;
+    _email = null;
     _hasCompletedProfile = false;
     apiClient.setToken(null);
     await _storage.delete(key: _tokenKey);
+    await _storage.delete(key: _emailKey);
     notifyListeners();
   }
 }

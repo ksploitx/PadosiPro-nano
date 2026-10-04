@@ -54,6 +54,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await appState.saveToken(
         result.accessToken,
         hasCompletedProfile: result.hasCompletedProfile,
+        email: _emailController.text.trim(),
       );
 
       if (!mounted) return;

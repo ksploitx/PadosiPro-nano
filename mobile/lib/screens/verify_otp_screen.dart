@@ -116,6 +116,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
       await appState.saveToken(
         result.accessToken,
         hasCompletedProfile: result.hasCompletedProfile,
+        email: _email,
       );
       if (!mounted) return;
       Navigator.pushReplacementNamed(context, HomeGate.routeName);
