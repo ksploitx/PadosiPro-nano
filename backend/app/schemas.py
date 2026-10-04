@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 from pydantic import BaseModel, EmailStr, field_validator
 
 class RegisterRequest(BaseModel):
@@ -95,12 +96,40 @@ class TaskResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class TaskSelectionRequest(BaseModel):
-    task_ids: list[str]
+# ── Task Selection (Phase 5) ──────────────────────────────────────────────────
 
-    @field_validator('task_ids')
+class TaskSelectionItem(BaseModel):
+    """One item in a task-selection batch: the task id plus optional scheduling hints."""
+    task_id: str
+    requested_time: datetime | None = None
+    note: str | None = None
+
+    @field_validator('note')
     @classmethod
-    def validate_not_empty(cls, v: list[str]) -> list[str]:
-        if not v:
-            raise ValueError('task_ids must contain at least one task id')
+    def validate_note_length(cls, v: str | None) -> str | None:
+        if v is not None and len(v) > 280:
+            raise ValueError('note must be 280 characters or fewer')
         return v
+
+
+class TaskSelectionRequest(BaseModel):
+    selections: list[TaskSelectionItem]
+
+    @field_validator('selections')
+    @classmethod
+    def validate_not_empty(cls, v: list[TaskSelectionItem]) -> list[TaskSelectionItem]:
+        if not v:
+            raise ValueError('selections must contain at least one item')
+        return v
+
+
+class TaskSelectionResponse(BaseModel):
+    """A selected task enriched with the user's scheduling hints."""
+    id: str
+    name: str
+    category: str
+    description: str
+    requested_time: datetime | None
+    note: str | None
+
+    model_config = {"from_attributes": True}

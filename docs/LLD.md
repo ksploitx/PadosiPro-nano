@@ -48,10 +48,12 @@ CREATE TABLE tasks (
 CREATE INDEX idx_tasks_category ON tasks(category);
 
 CREATE TABLE task_selections (
-    id         TEXT PRIMARY KEY,
-    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    task_id    TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
-    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    id             TEXT PRIMARY KEY,
+    user_id        TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    task_id        TEXT NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+    requested_time DATETIME,                  -- customer's preferred service time (nullable)
+    note           VARCHAR(280),              -- short note ≤ 280 chars (nullable)
+    created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (user_id, task_id)
 );
 ```
@@ -114,13 +116,34 @@ Success `200`: profile object. **`404`: no profile yet** — this is the signal 
 Success `200`: array of `{ "id", "name", "category", "description" }`.
 
 ### PUT /tasks/selection  (auth required)
-Request: `{ "task_ids": ["<id>", "<id>"] }`
-Validation: non-empty; every id must exist in `tasks`.
-Success `200`: array of the now-selected task objects (full replace).
-Errors: `401` · `422` empty list or unknown id.
+Request:
+```json
+{
+  "selections": [
+    {
+      "task_id": "<uuid>",
+      "requested_time": "2026-10-10T09:00:00Z",
+      "note": "Please come after 9 AM"
+    }
+  ]
+}
+```
+Validation: `selections` must be non-empty; every `task_id` must exist in `tasks`; `note` length ≤ 280 chars.
+Success `200`: array of saved selection objects (full replace) — each item has:
+```json
+{
+  "id": "<task-uuid>",
+  "name": "...",
+  "category": "...",
+  "description": "...",
+  "requested_time": "2026-10-10T09:00:00Z",
+  "note": "Please come after 9 AM"
+}
+```
+Errors: `401` · `422` empty selections, unknown id, note > 280 chars.
 
 ### GET /tasks/selection  (auth required)
-Success `200`: array of currently selected task objects (empty array if none).
+Success `200`: array of currently selected task objects with `requested_time` and `note` fields included (same shape as PUT 200 response). Empty array if none selected.
 
 ## 3. OTP state machine (the core risky logic)
 

@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timezone
-from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Index, UniqueConstraint
+from sqlalchemy import Column, String, Integer, DateTime, ForeignKey, Index, UniqueConstraint, Text
 from sqlalchemy.orm import relationship
 from app.database import Base
 
@@ -72,6 +72,8 @@ class TaskSelection(Base):
     id = Column(String, primary_key=True, default=generate_uuid)
     user_id = Column(String, ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
     task_id = Column(String, ForeignKey('tasks.id', ondelete='CASCADE'), nullable=False)
+    requested_time = Column(DateTime, nullable=True)          # customer's preferred service time
+    note = Column(String(280), nullable=True)                 # short note ≤ 280 chars
     created_at = Column(DateTime, nullable=False, default=utcnow)
 
     user = relationship("User", back_populates="task_selections")
