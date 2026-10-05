@@ -305,7 +305,15 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                     ],
 
                     // ── 6-box OTP input ───────────────────────────────────
-                    Row(
+                    // Bug 3: compute responsive box width so all 6 digits fit
+                    // regardless of screen size, no overflow stripe.
+                    Builder(builder: (context) {
+                      final screenWidth =
+                          MediaQuery.of(context).size.width;
+                      // 48px total side padding (24 each) + 8px gaps (4px × 2 × 6 boxes)
+                      final boxWidth = ((screenWidth - 48 - 48) / _digitCount)
+                          .clamp(36.0, 52.0);
+                      return Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: List.generate(_digitCount, (i) {
                         final isFocused = i == _focusedIndex;
@@ -314,7 +322,7 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                           onTap: () => setState(() => _focusedIndex = i),
                           child: Container(
                             margin: const EdgeInsets.symmetric(horizontal: 4),
-                            width: 48,
+                            width: boxWidth,
                             height: 56,
                             decoration: BoxDecoration(
                               color: AppColors.surface,
@@ -353,7 +361,8 @@ class _VerifyOtpScreenState extends State<VerifyOtpScreen> {
                           ),
                         );
                       }),
-                    ),
+                      );
+                    }),
                     const SizedBox(height: 10),
 
                     // ── Security note ────────────────────────────────────

@@ -6,7 +6,7 @@ import '../state/app_state.dart';
 import '../theme.dart';
 import '../models/profile.dart';
 import '../services/profile_service.dart';
-import 'task_selection_screen.dart'; // TaskSelectionScreen.routeName
+import 'tab_shell.dart'; // navigate to TabShell, not bare TaskSelectionScreen
 
 /// Profile setup screen — matches figma/Create_Profile.png.
 ///
@@ -14,8 +14,7 @@ import 'task_selection_screen.dart'; // TaskSelectionScreen.routeName
 ///   1. User fills Full name, Mobile number (10 digits, +91 prefix shown),
 ///      Address (multiline), Business name (optional).
 ///   2. Taps "Continue →" → PUT /profile → on success markProfileCompleted()
-///      then navigate to TaskSelectionScreen (replacing this route so back
-///      doesn't return here).
+///      then navigate to TabShell (Home tab, index 0) replacing this route.
 class ProfileScreen extends StatefulWidget {
   static const routeName = '/profile';
   const ProfileScreen({super.key});
@@ -70,9 +69,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appState.markProfileCompleted();
 
       if (!mounted) return;
+      // Bug 5: navigate to TabShell so the bottom nav is always visible.
+      // Home tab (index 0) shows the "Welcome to PadosiPro!" empty state.
       Navigator.pushNamedAndRemoveUntil(
         context,
-        TaskSelectionScreen.routeName,
+        TabShell.routeName,
         (_) => false,
       );
     } on Exception catch (e) {

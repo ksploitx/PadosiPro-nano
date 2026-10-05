@@ -17,10 +17,10 @@ class HomeTabScreen extends StatefulWidget {
   const HomeTabScreen({super.key});
 
   @override
-  State<HomeTabScreen> createState() => _HomeTabScreenState();
+  State<HomeTabScreen> createState() => HomeTabScreenState();
 }
 
-class _HomeTabScreenState extends State<HomeTabScreen> {
+class HomeTabScreenState extends State<HomeTabScreen> {
   List<SelectedTask> _tasks = [];
   bool _loading = true;
   String? _error;
@@ -28,6 +28,10 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void refresh() {
     _load();
   }
 
@@ -98,26 +102,24 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
 
     return _TaskList(
       tasks: _tasks,
-      // "Edit tasks" → open review step with tasks pre-loaded
-      onEditTasks: _openEditTasks,
+      onEditTask: _openEditSheet,
     );
   }
 
-  /// Opens TaskSelectionScreen pushed on top of the current Navigator,
-  /// jumping directly to the review step with existing tasks pre-checked.
-  /// On return, reload the Home task list.
-  void _openEditTasks() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const TaskSelectionScreen(
-          preloadSelection: true,
-          startAtReview: true,
-        ),
+  /// Opens a bottom sheet to edit or remove a single task.
+  void _openEditSheet(SelectedTask task) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.background,
+      builder: (ctx) => _EditTaskBottomSheet(
+        task: task,
+        onSuccess: () {
+          Navigator.pop(ctx);
+          _load();
+        },
       ),
-    ).then((_) {
-      if (mounted) _load();
-    });
+    );
   }
 }
 
@@ -127,9 +129,9 @@ class _HomeTabScreenState extends State<HomeTabScreen> {
 
 class _TaskList extends StatelessWidget {
   final List<SelectedTask> tasks;
-  final VoidCallback onEditTasks;
+  final void Function(SelectedTask) onEditTask;
 
-  const _TaskList({required this.tasks, required this.onEditTasks});
+  const _TaskList({required this.tasks, required this.onEditTask});
 
   @override
   Widget build(BuildContext context) {
@@ -205,15 +207,15 @@ class _TaskList extends StatelessWidget {
         const SizedBox(height: 12),
 
         // ── Task cards ───────────────────────────────────────────────────────
-        ...tasks.map((t) => _TaskCard(task: t)),
+        ...tasks.map((t) => _TaskCard(task: t, onEdit: () => onEditTask(t))),
         const SizedBox(height: 24),
 
-        // ── Edit tasks button ────────────────────────────────────────────────
+        // ── Add more services button ─────────────────────────────────────────
         Center(
           child: ElevatedButton.icon(
-            onPressed: onEditTasks,
-            icon: const Icon(Icons.edit_outlined, size: 18),
-            label: const Text('Edit tasks'),
+            onPressed: () => TabShell.of(context).switchTab(1),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text('Add more services'),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
@@ -240,7 +242,8 @@ class _TaskList extends StatelessWidget {
 
 class _TaskCard extends StatelessWidget {
   final SelectedTask task;
-  const _TaskCard({required this.task});
+  final VoidCallback onEdit;
+  const _TaskCard({required this.task, required this.onEdit});
 
   @override
   Widget build(BuildContext context) {
@@ -305,6 +308,13 @@ class _TaskCard extends StatelessWidget {
                 ],
               ],
             ),
+          ),
+          const SizedBox(width: 8),
+          IconButton(
+            icon: const Icon(Icons.edit_outlined, color: AppColors.textSecondary, size: 20),
+            onPressed: onEdit,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
           ),
         ],
       ),
@@ -489,6 +499,313 @@ class _ErrorState extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Edit Task Bottom Sheet ───────────────────────────────────────────────────
+
+class _EditTaskBottomSheet extends StatefulWidget {
+  final SelectedTask task;
+  final VoidCallback onSuccess;
+
+  const _EditTaskBottomSheet({required this.task, required this.onSuccess});
+
+  @override
+  State<_EditTaskBottomSheet> createState() => _EditTaskBottomSheetState();
+}
+
+class _EditTaskBottomSheetState extends State<_EditTaskBottomSheet> {
+  static const _slots = [
+    ('9 AM – 12 PM', 9),
+    ('1 PM – 3 PM', 13),
+    ('4 PM – 6 PM', 16),
+  ];
+
+  int? _selectedDateIdx;
+  int? _selectedSlotIdx;
+  late final TextEditingController _noteCtrl;
+
+  bool _saving = false;
+  bool _removing = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _noteCtrl = TextEditingController(text: widget.task.note ?? '');
+
+    final existing = widget.task.requestedTime;
+    if (existing != null) {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
+      final diff = DateTime(existing.year, existing.month, existing.day)
+          .difference(today)
+          .inDays;
+      if (diff >= 0 && diff < 14) _selectedDateIdx = diff;
+      for (int i = 0; i < _slots.length; i++) {
+        if (existing.hour == _slots[i].$2) {
+          _selectedSlotIdx = i;
+          break;
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _noteCtrl.dispose();
+    super.dispose();
+  }
+
+  DateTime? _getRequestedTime() {
+    if (_selectedDateIdx == null || _selectedSlotIdx == null) return null;
+    final base = DateTime.now();
+    final date = DateTime(base.year, base.month, base.day).add(Duration(days: _selectedDateIdx!));
+    final hour = _slots[_selectedSlotIdx!].$2;
+    return DateTime(date.year, date.month, date.day, hour, 0);
+  }
+
+  Future<void> _save() async {
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
+    try {
+      final appState = context.read<AppState>();
+      final service = TaskService(appState.apiClient);
+      final noteText = _noteCtrl.text.trim();
+      
+      await service.updateSelection(
+        widget.task.id,
+        time: _getRequestedTime(),
+        note: noteText.isEmpty ? null : noteText,
+      );
+      
+      if (!mounted) return;
+      widget.onSuccess();
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'Could not save. Check connection.');
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _remove() async {
+    setState(() {
+      _removing = true;
+      _error = null;
+    });
+    try {
+      final appState = context.read<AppState>();
+      final service = TaskService(appState.apiClient);
+      
+      await service.removeSelection(widget.task.id);
+      
+      if (!mounted) return;
+      widget.onSuccess();
+    } on ApiException catch (e) {
+      setState(() => _error = e.message);
+    } catch (_) {
+      setState(() => _error = 'Could not remove. Check connection.');
+    } finally {
+      if (mounted) setState(() => _removing = false);
+    }
+  }
+
+  String _dateLabel(int dayOffset) {
+    final date = DateTime.now().add(Duration(days: dayOffset));
+    if (dayOffset == 0) return 'Today';
+    if (dayOffset == 1) return 'Tomorrow';
+    const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    return '${weekdays[date.weekday - 1]} ${date.day} ${months[date.month - 1]}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Determine bottom padding for keyboard
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 24, 20, 24 + bottomInset),
+      decoration: const BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Edit ${widget.task.name}',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () => Navigator.pop(context),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            if (_error != null) ...[
+              Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+              const SizedBox(height: 12),
+            ],
+            
+            // Date row
+            const Text('Preferred date', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 36,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: 14,
+                separatorBuilder: (_, __) => const SizedBox(width: 6),
+                itemBuilder: (context, i) {
+                  final selected = _selectedDateIdx == i;
+                  return GestureDetector(
+                    onTap: () => setState(() => _selectedDateIdx = selected ? null : i),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 140),
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primary : AppColors.badgeBackground,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: selected ? AppColors.primary : AppColors.divider),
+                      ),
+                      child: Text(
+                        _dateLabel(i),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: selected ? Colors.white : AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            
+            // Time slots
+            const Text('Preferred time slot', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            Row(
+              children: List.generate(_slots.length, (i) {
+                final selected = _selectedSlotIdx == i;
+                return Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(right: i < _slots.length - 1 ? 6 : 0),
+                    child: GestureDetector(
+                      onTap: () => setState(() => _selectedSlotIdx = selected ? null : i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 140),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        decoration: BoxDecoration(
+                          color: selected ? AppColors.primary : AppColors.badgeBackground,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: selected ? AppColors.primary : AppColors.divider),
+                        ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          _slots[i].$1,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: selected ? Colors.white : AppColors.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 16),
+            
+            // Note
+            const Text('Note', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _noteCtrl,
+              maxLength: 280,
+              maxLines: 2,
+              decoration: InputDecoration(
+                hintText: 'Short note for the runner',
+                hintStyle: const TextStyle(fontSize: 13, color: AppColors.textHint),
+                counterStyle: const TextStyle(fontSize: 11, color: AppColors.textHint),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.divider),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.divider),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(10),
+                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _saving || _removing ? null : _remove,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.error,
+                      side: const BorderSide(color: AppColors.error),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: _removing 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('Remove Task', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _saving || _removing ? null : _save,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    child: _saving 
+                      ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : const Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
             ),
           ],
         ),

@@ -115,21 +115,17 @@ Success `200`: profile object. **`404`: no profile yet** — this is the signal 
 ### GET /tasks/catalogue  (no auth)
 Success `200`: array of `{ "id", "name", "category", "description" }`.
 
-### PUT /tasks/selection  (auth required)
+### POST /tasks/selection  (auth required)
 Request:
 ```json
 {
-  "selections": [
-    {
-      "task_id": "<uuid>",
-      "requested_time": "2026-10-10T09:00:00Z",
-      "note": "Please come after 9 AM"
-    }
-  ]
+  "task_id": "<uuid>",
+  "requested_time": "2026-10-10T09:00:00Z",
+  "note": "Please come after 9 AM"
 }
 ```
-Validation: `selections` must be non-empty; every `task_id` must exist in `tasks`; `note` length ≤ 280 chars.
-Success `200`: array of saved selection objects (full replace) — each item has:
+Validation: `task_id` must exist in `tasks`; `note` length ≤ 280 chars.
+Success `200`: saved selection object. If already selected, updates time/note (upsert).
 ```json
 {
   "id": "<task-uuid>",
@@ -140,7 +136,22 @@ Success `200`: array of saved selection objects (full replace) — each item has
   "note": "Please come after 9 AM"
 }
 ```
-Errors: `401` · `422` empty selections, unknown id, note > 280 chars.
+Errors: `401` · `422` unknown id, note > 280 chars.
+
+### PATCH /tasks/selection/{task_id}  (auth required)
+Request:
+```json
+{
+  "requested_time": "2026-10-10T10:00:00Z",
+  "note": "Updated note"
+}
+```
+Success `200`: the updated selection object.
+Errors: `401` · `404` not found · `422` validation.
+
+### DELETE /tasks/selection/{task_id}  (auth required)
+Success `204`: no content.
+Errors: `401` · `404` not found.
 
 ### GET /tasks/selection  (auth required)
 Success `200`: array of currently selected task objects with `requested_time` and `note` fields included (same shape as PUT 200 response). Empty array if none selected.
@@ -179,7 +190,7 @@ app/
   routers/
     auth.py       register, resend-otp, verify-otp, login
     profile.py    PUT/GET /profile
-    tasks.py      GET /tasks/catalogue, PUT/GET /tasks/selection
+    tasks.py      GET /tasks/catalogue, POST/PATCH/DELETE/GET /tasks/selection (not full-replace)
   main.py         app instance, exception handlers, router includes
 tests/
   test_otp.py     unit tests on otp.py — write these before the endpoints

@@ -4,13 +4,11 @@ import 'home_screen.dart';
 import 'task_selection_screen.dart';
 import 'profile_tab_screen.dart';
 
-/// Post-login shell: 3-tab layout.
-///
-/// We render only the active tab so that state is rebuilt and fresh data is
-/// fetched from the backend whenever the user switches tabs.
+/// Post-login shell: 3-tab layout using [IndexedStack] so every tab's state
+/// (scroll position, loaded data, text fields) is preserved across tab switches.
 ///
 /// Individual tabs call [TabShell.of(context).switchTab(i)] to change the
-/// selected tab (e.g., Home tapping "Explore" jumps to Request tab).
+/// selected tab (e.g., Home tapping "Edit tasks" jumps to Request tab).
 class TabShell extends StatefulWidget {
   static const routeName = '/shell';
   const TabShell({super.key});
@@ -29,30 +27,33 @@ class TabShell extends StatefulWidget {
 class TabShellState extends State<TabShell> {
   int _currentIndex = 0;
 
+  final GlobalKey<HomeTabScreenState> _homeKey = GlobalKey();
+  final GlobalKey<TaskSelectionScreenState> _requestKey = GlobalKey();
+
   /// Switch to a tab by index (0=Home, 1=Request, 2=Profile).
   void switchTab(int index) {
     if (_currentIndex == index) return;
     setState(() => _currentIndex = index);
+    
+    if (index == 0) {
+      _homeKey.currentState?.refresh();
+    } else if (index == 1) {
+      _requestKey.currentState?.refresh();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    Widget currentTab;
-    switch (_currentIndex) {
-      case 0:
-        currentTab = const HomeTabScreen();
-        break;
-      case 1:
-        currentTab = const TaskSelectionScreen(preloadSelection: true);
-        break;
-      case 2:
-      default:
-        currentTab = const ProfileTabScreen();
-        break;
-    }
-
     return Scaffold(
-      body: currentTab,
+      // IndexedStack keeps every tab alive — state is preserved on switch.
+      body: IndexedStack(
+        index: _currentIndex,
+        children: [
+          HomeTabScreen(key: _homeKey),
+          TaskSelectionScreen(key: _requestKey, preloadSelection: true),
+          const ProfileTabScreen(),
+        ],
+      ),
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: switchTab,

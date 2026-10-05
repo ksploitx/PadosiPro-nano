@@ -4,7 +4,7 @@ from sqlalchemy.future import select
 
 from app.deps import get_db, get_current_user
 from app.models import User, Task, TaskSelection
-from app.schemas import TaskResponse, TaskSelectionRequest, TaskSelectionResponse
+from app.schemas import TaskResponse, TaskSelectionCreate, TaskSelectionUpdate, TaskSelectionResponse
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -16,76 +16,128 @@ async def get_catalogue(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
-@router.put("/selection", response_model=list[TaskSelectionResponse])
-async def replace_selection(
-    body: TaskSelectionRequest,
+@router.post("/selection", response_model=TaskSelectionResponse)
+async def add_selection(
+    body: TaskSelectionCreate,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Full-replace the user's task selection.
-    Rejects: empty selections list (422), any unknown task id (422).
-    Each item may carry an optional requested_time and/or note.
+    Adds a new task selection for the current user.
+    If the task is already selected, updates its time/note (upsert).
+    422 if task_id doesn't exist in the catalogue.
     """
-    submitted_ids = [item.task_id for item in body.selections]
-
-    # Validate every submitted id exists in tasks table
-    result = await db.execute(
-        select(Task).where(Task.id.in_(submitted_ids))
-    )
-    found_tasks = result.scalars().all()
-    found_ids = {t.id for t in found_tasks}
-    tasks_by_id = {t.id: t for t in found_tasks}
-
-    unknown = [tid for tid in submitted_ids if tid not in found_ids]
-    if unknown:
+    # Check if task exists
+    task_result = await db.execute(select(Task).where(Task.id == body.task_id))
+    task = task_result.scalars().first()
+    if not task:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"Unknown task id(s): {unknown}",
+            detail=f"Unknown task id: {body.task_id}",
         )
 
-    # Full replace: delete existing selections then insert fresh ones
-    existing = await db.execute(
-        select(TaskSelection).where(TaskSelection.user_id == current_user.id)
+    # Check if selection already exists
+    existing_result = await db.execute(
+        select(TaskSelection)
+        .where(TaskSelection.user_id == current_user.id)
+        .where(TaskSelection.task_id == body.task_id)
     )
-    for sel in existing.scalars().all():
-        await db.delete(sel)
+    selection = existing_result.scalars().first()
 
-    # Flush deletes so the UNIQUE constraint (user_id, task_id) is cleared
-    # before we insert the new rows — otherwise SQLite raises IntegrityError.
-    await db.flush()
-
-    new_selections: list[TaskSelection] = []
-    for item in body.selections:
-        sel = TaskSelection(
+    if selection:
+        # Upsert
+        selection.requested_time = body.requested_time
+        selection.note = body.note
+    else:
+        selection = TaskSelection(
             user_id=current_user.id,
-            task_id=item.task_id,
-            requested_time=item.requested_time,
-            note=item.note,
+            task_id=body.task_id,
+            requested_time=body.requested_time,
+            note=body.note,
         )
-        db.add(sel)
-        new_selections.append(sel)
+        db.add(selection)
 
     await db.commit()
+    await db.refresh(selection)
 
-    # Refresh each selection so SQLAlchemy populates any server-side defaults
-    for sel in new_selections:
-        await db.refresh(sel)
+    return TaskSelectionResponse(
+        id=task.id,
+        name=task.name,
+        category=task.category,
+        description=task.description,
+        requested_time=selection.requested_time,
+        note=selection.note,
+    )
 
-    # Build response: merge task fields with selection metadata, preserving order
-    response = []
-    for item, sel in zip(body.selections, new_selections):
-        task = tasks_by_id[item.task_id]
-        response.append(TaskSelectionResponse(
-            id=task.id,
-            name=task.name,
-            category=task.category,
-            description=task.description,
-            requested_time=sel.requested_time,
-            note=sel.note,
-        ))
 
-    return response
+@router.patch("/selection/{task_id}", response_model=TaskSelectionResponse)
+async def update_selection(
+    task_id: str,
+    body: TaskSelectionUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Updates an existing task selection for the current user.
+    404 if not found.
+    """
+    result = await db.execute(
+        select(TaskSelection)
+        .where(TaskSelection.user_id == current_user.id)
+        .where(TaskSelection.task_id == task_id)
+    )
+    selection = result.scalars().first()
+
+    if not selection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task selection not found",
+        )
+
+    selection.requested_time = body.requested_time
+    selection.note = body.note
+    await db.commit()
+    await db.refresh(selection)
+
+    task_result = await db.execute(select(Task).where(Task.id == task_id))
+    task = task_result.scalars().first()
+
+    return TaskSelectionResponse(
+        id=task.id,
+        name=task.name,
+        category=task.category,
+        description=task.description,
+        requested_time=selection.requested_time,
+        note=selection.note,
+    )
+
+
+@router.delete("/selection/{task_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def remove_selection(
+    task_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Removes a task selection for the current user.
+    404 if not found.
+    """
+    result = await db.execute(
+        select(TaskSelection)
+        .where(TaskSelection.user_id == current_user.id)
+        .where(TaskSelection.task_id == task_id)
+    )
+    selection = result.scalars().first()
+
+    if not selection:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Task selection not found",
+        )
+
+    await db.delete(selection)
+    await db.commit()
+    return
 
 
 @router.get("/selection", response_model=list[TaskSelectionResponse])

@@ -99,8 +99,8 @@ class TaskResponse(BaseModel):
 
 # ── Task Selection (Phase 5) ──────────────────────────────────────────────────
 
-class TaskSelectionItem(BaseModel):
-    """One item in a task-selection batch: the task id plus optional scheduling hints."""
+class TaskSelectionCreate(BaseModel):
+    """Body for POST /tasks/selection."""
     task_id: str
     requested_time: datetime | None = None
     note: str | None = None
@@ -113,14 +113,16 @@ class TaskSelectionItem(BaseModel):
         return v
 
 
-class TaskSelectionRequest(BaseModel):
-    selections: list[TaskSelectionItem]
+class TaskSelectionUpdate(BaseModel):
+    """Body for PATCH /tasks/selection/{task_id}."""
+    requested_time: datetime | None = None
+    note: str | None = None
 
-    @field_validator('selections')
+    @field_validator('note')
     @classmethod
-    def validate_not_empty(cls, v: list[TaskSelectionItem]) -> list[TaskSelectionItem]:
-        if not v:
-            raise ValueError('selections must contain at least one item')
+    def validate_note_length(cls, v: str | None) -> str | None:
+        if v is not None and len(v) > 280:
+            raise ValueError('note must be 280 characters or fewer')
         return v
 
 

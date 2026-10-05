@@ -33,18 +33,21 @@ class TaskSelectionScreen extends StatefulWidget {
   });
 
   @override
-  State<TaskSelectionScreen> createState() => _TaskSelectionScreenState();
+  State<TaskSelectionScreen> createState() => TaskSelectionScreenState();
 }
 
-class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
+class TaskSelectionScreenState extends State<TaskSelectionScreen> {
   // ── Catalogue state ───────────────────────────────────────────────────────
   List<Task> _catalogue = [];
   bool _loadingCatalogue = true;
   String? _catalogueError;
 
   // ── Selection state ───────────────────────────────────────────────────────
-  /// task_id → true/false
+  /// task_id → true/false (for UI checkbox state)
   final Map<String, bool> _selected = {};
+
+  /// task_ids that were already selected from the backend
+  final Set<String> _alreadySelected = {};
 
   final _searchCtrl = TextEditingController();
   String _searchQuery = '';
@@ -73,6 +76,16 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
     super.dispose();
   }
 
+  void refresh() {
+    // Clear out local search and selection so they get reset/re-fetched.
+    _searchCtrl.clear();
+    _searchQuery = '';
+    _selected.clear();
+    _reviewData.clear();
+    _reviewStep = false;
+    _loadCatalogue();
+  }
+
   Future<void> _loadCatalogue() async {
     final appState = context.read<AppState>();
     final service = TaskService(appState.apiClient);
@@ -80,18 +93,18 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
       final tasks = await service.getCatalogue();
       if (!mounted) return;
 
-      // If launched from "Edit tasks", load the current selection so we can
-      // pre-check + pre-fill those tasks.
-      if (widget.preloadSelection) {
-        try {
-          final existing = await service.getSelection();
-          for (final sel in existing) {
-            _selected[sel.id] = true;
-            _reviewData[sel.id] = _ReviewData.fromExisting(sel);
-          }
-        } catch (_) {
-          // Non-fatal: proceed without pre-fill.
+      // Load the current selection so we can disable existing ones.
+      try {
+        final existing = await service.getSelection();
+        for (final sel in existing) {
+          _selected[sel.id] = true;
+          _alreadySelected.add(sel.id);
+          // If launched from "Edit tasks", we might want review data, but "Edit tasks" is being changed to "Add more services" which just opens this normally.
+          // Pre-fill reviewData just in case startAtReview is still used.
+          _reviewData[sel.id] = _ReviewData.fromExisting(sel);
         }
+      } catch (_) {
+        // Non-fatal: proceed without pre-fill.
       }
 
       setState(() {
@@ -135,18 +148,18 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
               t.description.toLowerCase().contains(_searchQuery)))
       .toList();
 
-  int get _totalSelected => _selected.values.where((v) => v).length;
+  int get _totalSelected => _newlySelectedTasks.length;
 
-  List<Task> get _selectedTasks =>
-      _catalogue.where((t) => _selected[t.id] == true).toList();
+  List<Task> get _newlySelectedTasks =>
+      _catalogue.where((t) => _selected[t.id] == true && !_alreadySelected.contains(t.id)).toList();
 
   // ── Actions ───────────────────────────────────────────────────────────────
 
   void _onConfirm() {
     if (_totalSelected == 0) return;
 
-    // Initialize review data for newly selected tasks (preserve existing ones)
-    for (final task in _selectedTasks) {
+    // Initialize review data for newly selected tasks
+    for (final task in _newlySelectedTasks) {
       _reviewData.putIfAbsent(task.id, () => _ReviewData());
     }
 
@@ -166,16 +179,15 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
       final appState = context.read<AppState>();
       final service = TaskService(appState.apiClient);
 
-      final items = _selectedTasks.map((task) {
+      // Submit each new selection via POST
+      for (final task in _newlySelectedTasks) {
         final rd = _reviewData[task.id]!;
-        return TaskSelectionItem(
-          taskId: task.id,
-          requestedTime: rd.requestedTime,
+        await service.addSelection(
+          task.id,
+          time: rd.requestedTime,
           note: rd.noteCtrl.text.trim().isEmpty ? null : rd.noteCtrl.text.trim(),
         );
-      }).toList();
-
-      await service.saveSelection(items);
+      }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -395,38 +407,41 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
 
   Widget _buildTaskTile(Task task) {
     final isSelected = _selected[task.id] == true;
+    final isAlreadySelected = _alreadySelected.contains(task.id);
 
-    return InkWell(
-      onTap: () => setState(() => _selected[task.id] = !isSelected),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.divider,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 150),
-              width: 24,
-              height: 24,
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.transparent,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.divider,
-                  width: 1.5,
-                ),
-              ),
-              child: isSelected
-                  ? const Icon(Icons.check, size: 16, color: Colors.white)
-                  : null,
+    return Opacity(
+      opacity: isAlreadySelected ? 0.6 : 1.0,
+      child: InkWell(
+        onTap: isAlreadySelected ? null : () => setState(() => _selected[task.id] = !isSelected),
+        child: Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: isAlreadySelected ? AppColors.badgeBackground : AppColors.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : AppColors.divider,
+              width: isSelected ? 1.5 : 1,
             ),
+          ),
+          child: Row(
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 150),
+                width: 24,
+                height: 24,
+                decoration: BoxDecoration(
+                  color: isSelected ? (isAlreadySelected ? AppColors.textHint : AppColors.primary) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: isSelected ? (isAlreadySelected ? AppColors.textHint : AppColors.primary) : AppColors.divider,
+                    width: 1.5,
+                  ),
+                ),
+                child: isSelected
+                    ? const Icon(Icons.check, size: 16, color: Colors.white)
+                    : null,
+              ),
             const SizedBox(width: 12),
             Expanded(
               child: Column(
@@ -457,13 +472,14 @@ class _TaskSelectionScreenState extends State<TaskSelectionScreen> {
           ],
         ),
       ),
+    ),
     );
   }
 
   // ── Step 2: review ────────────────────────────────────────────────────────
 
   Widget _buildReviewStep() {
-    final tasks = _selectedTasks;
+    final tasks = _newlySelectedTasks;
 
     return Scaffold(
       backgroundColor: AppColors.background,

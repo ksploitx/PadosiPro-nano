@@ -24,9 +24,8 @@ class ApiClient {
   //   Use the Mac's LAN IP (not 10.0.2.2 which is emulator-only).
   //   Find it with:  ipconfig getifaddr en0
   //
-  // Android emulator only: use 10.0.2.2 (maps to host loopback).
-  static const String baseUrl = 'http://192.168.1.3:8000';
-
+  static const String baseUrl = 'http://192.168.1.2:8000';
+  // static const String baseUrl = 'http://10.0.2.2:8000';
   String? _token;
 
   /// Update the stored Bearer token (call after login/verify-otp).
@@ -93,6 +92,32 @@ class ApiClient {
       uri,
       headers: _headers(auth: auth),
       body: jsonEncode(body),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<dynamic> patch(
+    String path,
+    Map<String, dynamic> body, {
+    bool auth = false,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final response = await http.patch(
+      uri,
+      headers: _headers(auth: auth),
+      body: jsonEncode(body),
+    );
+    return _handleResponse(response);
+  }
+
+  Future<dynamic> delete(
+    String path, {
+    bool auth = false,
+  }) async {
+    final uri = Uri.parse('$baseUrl$path');
+    final response = await http.delete(
+      uri,
+      headers: _headers(auth: auth),
     );
     return _handleResponse(response);
   }
