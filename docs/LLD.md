@@ -154,7 +154,7 @@ Success `204`: no content.
 Errors: `401` · `404` not found.
 
 ### GET /tasks/selection  (auth required)
-Success `200`: array of currently selected task objects with `requested_time` and `note` fields included (same shape as PUT 200 response). Empty array if none selected.
+Success `200`: array of currently selected task objects with `requested_time` and `note` fields included. Empty array if none selected.
 
 ## 3. OTP state machine (the core risky logic)
 

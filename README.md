@@ -1,81 +1,80 @@
-# PadosiPro Nano
+<p align="center">
+  <img src="docs/padosipro-logo.png" alt="PadosiPro Logo" width="200" />
+</p>
 
-A modern web and mobile application featuring a FastAPI backend and a Flutter mobile app. 
+<h1 align="center">PadosiPro Nano</h1>
 
-## Prerequisites
-- [Docker](https://www.docker.com/) and Docker Compose (for containerized execution)
-- [Python 3.10+](https://www.python.org/) (for local backend execution)
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (for mobile app)
-- [Android Studio](https://developer.android.com/studio) (for building the APK)
+<p align="center">
+  <strong>A modern web and mobile application featuring a FastAPI backend and a Flutter mobile app.</strong>
+</p>
 
-## Environment Variables
-The backend uses a `.env` file to manage configuration. Never commit real secrets to version control. An example file `.env.example` is provided in the `backend/` directory.
+---
 
-To set up your environment:
-1. Copy the example file: `cp backend/.env.example backend/.env`
-2. Update the values in `backend/.env` with your actual local configuration.
+## 📚 Architecture & Design
 
-## Backend Setup
+For a deeper dive into the system's architecture, design decisions, and system flows, refer to the following documentation:
 
-You can run the backend in two ways: using Docker Compose or locally via a Python virtual environment.
+- **[High-Level Design (HLD)](docs/HLD.md)** - System architecture, sequence diagrams, and high-level flows.
+- **[Low-Level Design (LLD)](docs/LLD.md)** - Component-level details, database schemas, and API specifications.
+- **[Design Decisions](DESIGN.md)** - Technology stack, key decisions, testing strategies, and known trade-offs.
 
-### Method 1: Using Docker Compose (Recommended)
-This will spin up the FastAPI app, Redis, and Mailpit in isolated containers.
+---
 
-1. Navigate to the backend directory:
-   ```bash
-   cd backend
-   ```
-2. Start the services in detached mode:
-   ```bash
-   docker compose up --build -d
-   ```
-3. Check the logs if needed:
-   ```bash
-   docker compose logs -f api
-   ```
-4. Verify the API is running:
-   ```bash
-   curl http://localhost:8000/health
-   ```
+## 🛠️ Prerequisites
 
-### Method 2: Locally with a Virtual Environment (with Docker for backing services)
-Use this method if you want to run the FastAPI app directly on your host machine for easier debugging, while keeping the database/redis isolated.
+Ensure you have the following installed before getting started:
 
-1. Start Redis and Mailpit via Docker Compose:
-   ```bash
-   cd backend
-   docker compose up -d redis mailpit
-   ```
-2. Create and activate a virtual environment:
-   ```bash
-   python3 -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-3. Install dependencies:
-   ```bash
-   pip install -r requirements.txt
-   ```
-4. Run the FastAPI application:
-   ```bash
-   uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+- 🐳 **Docker Desktop** (or Docker Engine + Compose plugin)
+- 💙 **[Flutter SDK](https://docs.flutter.dev/get-started/install)** (required for the mobile app)
+- 🤖 **[Android Studio](https://developer.android.com/studio)** (required for building the APK and running the Android emulator)
 
-**Testing on Localhost & Postman:**
-- Once running, the API is available at `http://localhost:8000`.
-- **Swagger UI (Interactive Docs):** Open `http://localhost:8000/docs` in your browser. This is the easiest way to test endpoints without Postman.
-- **Mailpit UI (OTP Emails):** Open `http://localhost:8025` in your browser to see the verification emails.
+---
 
-If you prefer **Postman**:
-1. Create a new request in Postman.
-2. Set the method (e.g., `POST`).
-3. Set the URL (e.g., `http://localhost:8000/auth/register`).
-4. Go to the **Body** tab, select **raw** and choose **JSON**.
-5. Paste the request payload (e.g., `{"email": "test@example.com", "password": "Password123"}`) and click **Send**.
+## 🚀 Backend Setup
 
-## Building the APK (Mobile)
+The backend runs entirely in Docker for a seamless experience.
 
-To build the Android application package (APK) for the Flutter mobile app:
+```bash
+cd backend
+cp .env.example .env
+docker compose up --build
+```
+
+### 🌱 Seeding the Database
+
+The task catalogue is seeded automatically on the first run. However, if you need to manually inject or refresh the seed data at any point, you can run the following Docker command while your container is running:
+
+```bash
+docker compose exec api python -m app.seed
+```
+
+### 🔗 Useful Links
+
+- **API (Swagger UI):** [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Mailpit (OTP Emails):** [http://localhost:8025](http://localhost:8025)
+
+---
+
+## 📱 Mobile Setup
+
+Run the mobile app using Flutter:
+
+```bash
+cd mobile
+flutter pub get
+flutter run
+```
+
+> **Note:** Before running, open `lib/services/api_client.dart` and set the `baseUrl` to match your target environment:
+>
+> - **Android Emulator:** Use `http://10.0.2.2:8000` _(already default in code)_
+> - **Physical Device:** Use your machine's LAN IP _(e.g., `http://192.168.x.x:8000`)_
+
+---
+
+## 📦 Building the APK (Release)
+
+To build the Android application package (APK) for production:
 
 1. Ensure your Flutter environment is correctly set up and Android licenses are accepted:
    ```bash

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
 
 /// Thrown whenever the backend returns a non-2xx status.
@@ -24,8 +25,8 @@ class ApiClient {
   //   Use the Mac's LAN IP (not 10.0.2.2 which is emulator-only).
   //   Find it with:  ipconfig getifaddr en0
   //
-  static const String baseUrl = 'http://192.168.1.2:8000';
-  // static const String baseUrl = 'http://10.0.2.2:8000';
+  // static const String baseUrl = 'http://192.168.1.2:8000';
+  static const String baseUrl = 'http://10.0.2.2:8000';
   String? _token;
 
   /// Update the stored Bearer token (call after login/verify-otp).
@@ -62,9 +63,25 @@ class ApiClient {
 
   // ── Public methods ────────────────────────────────────────────────────────
 
+  Future<http.Response> _executeWithTimeout(
+    Future<http.Response> request,
+  ) async {
+    try {
+      return await request.timeout(const Duration(seconds: 10));
+    } on TimeoutException {
+      throw const ApiException(
+        statusCode: 0,
+        message:
+            "Could not reach the server. Check your connection and try again.",
+      );
+    }
+  }
+
   Future<dynamic> get(String path, {bool auth = false}) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http.get(uri, headers: _headers(auth: auth));
+    final response = await _executeWithTimeout(
+      http.get(uri, headers: _headers(auth: auth)),
+    );
     return _handleResponse(response);
   }
 
@@ -74,10 +91,12 @@ class ApiClient {
     bool auth = false,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http.post(
-      uri,
-      headers: _headers(auth: auth),
-      body: jsonEncode(body),
+    final response = await _executeWithTimeout(
+      http.post(
+        uri,
+        headers: _headers(auth: auth),
+        body: jsonEncode(body),
+      ),
     );
     return _handleResponse(response);
   }
@@ -88,10 +107,12 @@ class ApiClient {
     bool auth = false,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http.put(
-      uri,
-      headers: _headers(auth: auth),
-      body: jsonEncode(body),
+    final response = await _executeWithTimeout(
+      http.put(
+        uri,
+        headers: _headers(auth: auth),
+        body: jsonEncode(body),
+      ),
     );
     return _handleResponse(response);
   }
@@ -102,22 +123,20 @@ class ApiClient {
     bool auth = false,
   }) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http.patch(
-      uri,
-      headers: _headers(auth: auth),
-      body: jsonEncode(body),
+    final response = await _executeWithTimeout(
+      http.patch(
+        uri,
+        headers: _headers(auth: auth),
+        body: jsonEncode(body),
+      ),
     );
     return _handleResponse(response);
   }
 
-  Future<dynamic> delete(
-    String path, {
-    bool auth = false,
-  }) async {
+  Future<dynamic> delete(String path, {bool auth = false}) async {
     final uri = Uri.parse('$baseUrl$path');
-    final response = await http.delete(
-      uri,
-      headers: _headers(auth: auth),
+    final response = await _executeWithTimeout(
+      http.delete(uri, headers: _headers(auth: auth)),
     );
     return _handleResponse(response);
   }
